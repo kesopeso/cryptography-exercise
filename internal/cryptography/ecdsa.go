@@ -4,11 +4,16 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"os"
 )
+
+// pemKeyType is the expected header for SEC 1 ECDSA private keys.
+const PemKeyType = "EC PRIVATE KEY"
 
 // GenerateAndSaveECDSAKey generates a new ECDSA private key using the P-256 (secp256r1) curve
 // and saves it to the specified filepath in PEM-encoded format.
@@ -36,7 +41,7 @@ func GenerateAndSaveECDSAKey(filepath string) error {
 	defer file.Close()
 
 	pemBlock := &pem.Block{
-		Type:  "EC PRIVATE KEY",
+		Type:  PemKeyType,
 		Bytes: der,
 	}
 
@@ -46,4 +51,36 @@ func GenerateAndSaveECDSAKey(filepath string) error {
 	}
 
 	return nil
+}
+
+// SignMessage reads an ECDSA private key from a PEM file and signs the given message.
+// The message is hashed with SHA-256 before signing.
+// The signature is returned as a Base64URL-encoded string.
+func SignMessage(keyPath string, message string) (string, error) {
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return "", fmt.Errorf("failed to decode PEM block")
+	}
+	if block.Type != PemKeyType {
+		return "", fmt.Errorf("invalid key type: %s", block.Type)
+	}
+
+	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse EC private key: %w", err)
+	}
+
+	hash := sha256.Sum256([]byte(message))
+
+	sig, err := ecdsa.SignASN1(rand.Reader, privateKey, hash[:])
+	if err != nil {
+		return "", fmt.Errorf("failed to sign message: %w", err)
+	}
+
+	return base64.RawURLEncoding.EncodeToString(sig), nil
 }
