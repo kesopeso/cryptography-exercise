@@ -121,6 +121,30 @@ func TestGenerateAndSaveECDSAKey_ValidSignature(t *testing.T) {
 	}
 }
 
+func writeInvalidPEMFile(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	badFile := filepath.Join(dir, "bad.pem")
+	if err := os.WriteFile(badFile, []byte("not a pem file"), 0600); err != nil {
+		t.Fatalf("failed to write bad file: %v", err)
+	}
+	return badFile
+}
+
+func writeWrongKeyTypePEM(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "wrong_type.pem")
+	pemData := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: []byte("fake key data"),
+	})
+	if err := os.WriteFile(keyFile, pemData, 0600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+	return keyFile
+}
+
 func generateTestKey(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -194,11 +218,7 @@ func TestSignMessage_NonexistentKeyFile(t *testing.T) {
 }
 
 func TestSignMessage_InvalidPEMFile(t *testing.T) {
-	dir := t.TempDir()
-	badFile := filepath.Join(dir, "bad.pem")
-	if err := os.WriteFile(badFile, []byte("not a pem file"), 0600); err != nil {
-		t.Fatalf("failed to write bad file: %v", err)
-	}
+	badFile := writeInvalidPEMFile(t)
 
 	_, err := cryptography.SignMessage(badFile, "msg")
 	if err == nil {
@@ -207,16 +227,7 @@ func TestSignMessage_InvalidPEMFile(t *testing.T) {
 }
 
 func TestSignMessage_InvalidKeyType(t *testing.T) {
-	dir := t.TempDir()
-	keyFile := filepath.Join(dir, "wrong_type.pem")
-
-	pemData := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: []byte("fake key data"),
-	})
-	if err := os.WriteFile(keyFile, pemData, 0600); err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
+	keyFile := writeWrongKeyTypePEM(t)
 
 	_, err := cryptography.SignMessage(keyFile, "msg")
 	if err == nil {
@@ -246,5 +257,115 @@ func TestSignMessage_EmptyMessage(t *testing.T) {
 	hash := sha256.Sum256([]byte{})
 	if !ecdsa.VerifyASN1(&key.PublicKey, hash[:], sigBytes) {
 		t.Error("signature verification failed for empty message")
+	}
+}
+
+func TestVerifySignature(t *testing.T) {
+	keyPath := generateTestKey(t)
+	message := "hello world"
+
+	sig, err := cryptography.SignMessage(keyPath, message)
+	if err != nil {
+		t.Fatalf("SignMessage() error = %v", err)
+	}
+
+	valid, err := cryptography.VerifySignature(keyPath, message, sig)
+	if err != nil {
+		t.Fatalf("VerifySignature() error = %v", err)
+	}
+	if !valid {
+		t.Error("expected signature to be valid")
+	}
+}
+
+func TestVerifySignature_WrongMessage(t *testing.T) {
+	keyPath := generateTestKey(t)
+
+	sig, err := cryptography.SignMessage(keyPath, "original message")
+	if err != nil {
+		t.Fatalf("SignMessage() error = %v", err)
+	}
+
+	valid, err := cryptography.VerifySignature(keyPath, "tampered message", sig)
+	if err != nil {
+		t.Fatalf("VerifySignature() error = %v", err)
+	}
+	if valid {
+		t.Error("expected signature to be invalid for wrong message")
+	}
+}
+
+func TestVerifySignature_WrongKey(t *testing.T) {
+	keyPath1 := generateTestKey(t)
+	keyPath2 := generateTestKey(t)
+	message := "hello world"
+
+	sig, err := cryptography.SignMessage(keyPath1, message)
+	if err != nil {
+		t.Fatalf("SignMessage() error = %v", err)
+	}
+
+	valid, err := cryptography.VerifySignature(keyPath2, message, sig)
+	if err != nil {
+		t.Fatalf("VerifySignature() error = %v", err)
+	}
+	if valid {
+		t.Error("expected signature to be invalid for different key")
+	}
+}
+
+func TestVerifySignature_InvalidBase64URL(t *testing.T) {
+	keyPath := generateTestKey(t)
+
+	_, err := cryptography.VerifySignature(keyPath, "msg", "not-valid-base64!@#$%")
+	if err == nil {
+		t.Fatal("expected error for invalid Base64URL signature, got nil")
+	}
+}
+
+func TestVerifySignature_NonexistentKeyFile(t *testing.T) {
+	_, err := cryptography.VerifySignature("/nonexistent/key.pem", "msg", "c2ln")
+	if err == nil {
+		t.Fatal("expected error for nonexistent key file, got nil")
+	}
+}
+
+func TestVerifySignature_InvalidPEMFile(t *testing.T) {
+	badFile := writeInvalidPEMFile(t)
+
+	_, err := cryptography.VerifySignature(badFile, "msg", "c2ln")
+	if err == nil {
+		t.Fatal("expected error for invalid PEM, got nil")
+	}
+}
+
+func TestVerifySignature_InvalidKeyType(t *testing.T) {
+	keyFile := writeWrongKeyTypePEM(t)
+
+	_, err := cryptography.VerifySignature(keyFile, "msg", "c2ln")
+	if err == nil {
+		t.Fatal("expected error for invalid key type, got nil")
+	}
+
+	want := "invalid key type: RSA PRIVATE KEY"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestVerifySignature_EmptyMessage(t *testing.T) {
+	keyPath := generateTestKey(t)
+
+	sig, err := cryptography.SignMessage(keyPath, "")
+	if err != nil {
+		t.Fatalf("SignMessage() error = %v", err)
+	}
+
+	valid, err := cryptography.VerifySignature(keyPath, "", sig)
+	if err != nil {
+		t.Fatalf("VerifySignature() error = %v", err)
+	}
+	if !valid {
+		t.Error("expected signature to be valid for empty message")
 	}
 }
