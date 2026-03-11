@@ -60,6 +60,22 @@ func (pss *PostgresStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, 
 	return ids, rows.Err()
 }
 
+// GetEncodedStatus returns the encoded status string for the given statusId.
+func (pss *PostgresStatusStore) GetEncodedStatus(ctx context.Context, statusId string) (string, error) {
+	id, err := uuid.Parse(statusId)
+	if err != nil {
+		return "", fmt.Errorf("invalid status id: %w", err)
+	}
+
+	var encodedStatus string
+	err = pss.db.QueryRow(ctx, "SELECT encoded_status FROM statuses WHERE id = $1", id).Scan(&encodedStatus)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch status: %w", err)
+	}
+
+	return encodedStatus, nil
+}
+
 // CreateStatusValue adds new status value to the existing database status row.
 // Returns the index of the newly added value.
 func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error) {

@@ -12,11 +12,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
+	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
 )
 
 type mockStatusStore struct {
 	createStatusFn      func(ctx context.Context, status *bitset.Bitset) (uuid.UUID, error)
 	getStatusIdsFn      func(ctx context.Context) ([]uuid.UUID, error)
+	getEncodedStatusFn  func(ctx context.Context, statusId string) (string, error)
 	createStatusValueFn func(ctx context.Context, statusId string, value bool) (int, error)
 	updateStatusValueFn func(ctx context.Context, statusId string, index int, value bool) error
 }
@@ -27,6 +29,10 @@ func (m *mockStatusStore) CreateStatus(ctx context.Context, status *bitset.Bitse
 
 func (m *mockStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, error) {
 	return m.getStatusIdsFn(ctx)
+}
+
+func (m *mockStatusStore) GetEncodedStatus(ctx context.Context, statusId string) (string, error) {
+	return m.getEncodedStatusFn(ctx, statusId)
 }
 
 func (m *mockStatusStore) CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error) {
@@ -89,7 +95,7 @@ func TestCreateStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newStatusHandlers(tt.store)
+			h := newStatusHandlers(tt.store, "")
 
 			req := httptest.NewRequest(http.MethodPost, "/api/status", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -156,7 +162,7 @@ func TestListStatuses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newStatusHandlers(tt.store)
+			h := newStatusHandlers(tt.store, "")
 
 			req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 			rec := httptest.NewRecorder()
@@ -259,7 +265,7 @@ func TestCreateStatusValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newStatusHandlers(tt.store)
+			h := newStatusHandlers(tt.store, "")
 
 			req := httptest.NewRequest(http.MethodPost, "/api/status/"+tt.statusId, strings.NewReader(tt.body))
 			req = withChiURLParams(req, "statusId", tt.statusId)
@@ -357,7 +363,7 @@ func TestUpdateStatusValueToFalse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newStatusHandlers(tt.store)
+			h := newStatusHandlers(tt.store, "")
 
 			req := httptest.NewRequest(http.MethodDelete, "/api/status/"+tt.statusId+"/"+tt.index, nil)
 			req = withChiURLParams(req, "statusId", tt.statusId, "index", tt.index)
@@ -442,7 +448,7 @@ func TestUpdateStatusValueToTrue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newStatusHandlers(tt.store)
+			h := newStatusHandlers(tt.store, "")
 
 			req := httptest.NewRequest(http.MethodPut, "/api/status/"+tt.statusId+"/"+tt.index, nil)
 			req = withChiURLParams(req, "statusId", tt.statusId, "index", tt.index)
@@ -452,6 +458,114 @@ func TestUpdateStatusValueToTrue(t *testing.T) {
 
 			if rec.Code != tt.wantStatusCode {
 				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatusCode)
+			}
+		})
+	}
+}
+
+func TestGetStatusValue(t *testing.T) {
+	statusId := "01961234-5678-7abc-8def-0123456789ab"
+
+	validKeyPath := func(t *testing.T) string {
+		t.Helper()
+		path := t.TempDir() + "/key.pem"
+		if err := cryptography.GenerateAndSaveECDSAKey(path); err != nil {
+			t.Fatalf("failed to generate key: %v", err)
+		}
+		return path
+	}
+
+	tests := []struct {
+		name           string
+		statusId       string
+		index          string
+		store          *mockStatusStore
+		keyPath        string
+		wantStatusCode int
+		wantJWS        bool
+	}{
+		{
+			name:     "valid request",
+			statusId: statusId,
+			index:    "2",
+			store: &mockStatusStore{
+				getEncodedStatusFn: func(_ context.Context, gotStatusId string) (string, error) {
+					if gotStatusId != statusId {
+						t.Errorf("got statusId %q, want %q", gotStatusId, statusId)
+					}
+					return "encodedListValue", nil
+				},
+			},
+			wantStatusCode: http.StatusOK,
+			wantJWS:        true,
+		},
+		{
+			name:           "negative index",
+			statusId:       statusId,
+			index:          "-1",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:           "non-numeric index",
+			statusId:       statusId,
+			index:          "abc",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:     "store error",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				getEncodedStatusFn: func(_ context.Context, _ string) (string, error) {
+					return "", errors.New("db error")
+				},
+			},
+			keyPath:        "",
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name:     "sign error",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				getEncodedStatusFn: func(_ context.Context, _ string) (string, error) {
+					return "encodedListValue", nil
+				},
+			},
+			keyPath:        "/nonexistent/key.pem",
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyPath := tt.keyPath
+			if tt.wantJWS {
+				keyPath = validKeyPath(t)
+			}
+
+			h := newStatusHandlers(tt.store, keyPath)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/status/"+tt.statusId+"/"+tt.index, nil)
+			req = withChiURLParams(req, "statusId", tt.statusId, "index", tt.index)
+			rec := httptest.NewRecorder()
+
+			h.getStatusValue(rec, req)
+
+			if rec.Code != tt.wantStatusCode {
+				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatusCode)
+			}
+
+			if tt.wantJWS {
+				var resp map[string]string
+				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if resp["jws"] == "" {
+					t.Error("expected non-empty jws in response")
+				}
 			}
 		})
 	}

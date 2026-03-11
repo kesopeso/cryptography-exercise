@@ -8,9 +8,9 @@ import (
 
 // NewRouter creates a chi router with logging, middleware,
 // and all status API routes registered.
-func NewRouter(statusStore store.StatusStore) *chi.Mux {
+func NewRouter(statusStore store.StatusStore, keyPath string) *chi.Mux {
 	r := chi.NewRouter()
-	h := newStatusHandlers(statusStore)
+	h := newStatusHandlers(statusStore, keyPath)
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)

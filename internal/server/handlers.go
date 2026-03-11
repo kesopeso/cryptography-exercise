@@ -7,17 +7,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
+	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
 	"github.com/kesopeso/cryptography-exercise/internal/store"
 )
 
 // statusHandlers holds dependencies for the status API route handlers.
 type statusHandlers struct {
-	statusStore store.StatusStore
+	statusStore    store.StatusStore
+	signJWSKeyPath string
 }
 
-// newStatusHandlers creates a statusHandlers with the given StatusStore.
-func newStatusHandlers(statusStore store.StatusStore) *statusHandlers {
-	return &statusHandlers{statusStore: statusStore}
+// newStatusHandlers creates a statusHandlers with the given StatusStore and signing key path.
+func newStatusHandlers(statusStore store.StatusStore, signJWSKeyPath string) *statusHandlers {
+	return &statusHandlers{statusStore: statusStore, signJWSKeyPath: signJWSKeyPath}
 }
 
 // POST /api/status
@@ -96,7 +98,30 @@ func (h *statusHandlers) createStatusValue(w http.ResponseWriter, r *http.Reques
 // GET /api/status/{statusId}/{index}
 // Return a JWS compact signed message with the status payload.
 func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+	statusId := chi.URLParam(r, "statusId")
+
+	index, err := strconv.Atoi(chi.URLParam(r, "index"))
+	if err != nil || index < 0 {
+		http.Error(w, "index must be a non-negative integer", http.StatusBadRequest)
+		return
+	}
+
+	encodedList, err := h.statusStore.GetEncodedStatus(r.Context(), statusId)
+	if err != nil {
+		http.Error(w, "failed to get status", http.StatusNotFound)
+		return
+	}
+
+	issuer := "http://" + r.Host + "/api/status/" + statusId
+	token, err := cryptography.SignStatusJWS(h.signJWSKeyPath, issuer, encodedList, index)
+	if err != nil {
+		http.Error(w, "failed to sign token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"jws": token})
 }
 
 // PUT /api/status/{statusId}/{index}

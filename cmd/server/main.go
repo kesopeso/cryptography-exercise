@@ -22,7 +22,8 @@ func main() {
 	defer conn.Close(ctx)
 
 	statusStore := store.NewPostgresStatusStore(conn)
-	handler := server.NewRouter(statusStore)
+	keyPath := "./server.pem"
+	handler := server.NewRouter(statusStore, keyPath)
 
 	addr := ":8090"
 	httpServer := server.NewHttpServer(&http.Server{Addr: addr, Handler: handler})
