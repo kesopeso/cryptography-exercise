@@ -137,3 +137,87 @@ func TestAdd_AllFalse(t *testing.T) {
 		}
 	}
 }
+
+func TestSet_TrueToFalse(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+	bs.Add(true)
+	bs.Add(true)
+
+	err := bs.Set(1, false)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	// Bits: 1,0,1 = 0x05
+	if bs.data[0] != 0x05 {
+		t.Errorf("data[0] = %08b, want 00000101", bs.data[0])
+	}
+}
+
+func TestSet_FalseToTrue(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(false)
+	bs.Add(false)
+	bs.Add(false)
+
+	err := bs.Set(1, true)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	// Bits: 0,1,0 = 0x02
+	if bs.data[0] != 0x02 {
+		t.Errorf("data[0] = %08b, want 00000010", bs.data[0])
+	}
+}
+
+func TestSet_SecondByte(t *testing.T) {
+	bs := NewBitset()
+	for range 16 {
+		bs.Add(false)
+	}
+
+	err := bs.Set(10, true)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	if bs.data[0] != 0x00 {
+		t.Errorf("data[0] = %08b, want 00000000", bs.data[0])
+	}
+	// Bit 10 is index 2 in the second byte: 00000100 = 0x04
+	if bs.data[1] != 0x04 {
+		t.Errorf("data[1] = %08b, want 00000100", bs.data[1])
+	}
+}
+
+func TestSet_NegativeIndex(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+
+	err := bs.Set(-1, true)
+	if err == nil {
+		t.Fatal("expected error for negative index, got nil")
+	}
+}
+
+func TestSet_IndexOutOfBounds(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+	bs.Add(true)
+
+	err := bs.Set(2, true)
+	if err == nil {
+		t.Fatal("expected error for out of bounds index, got nil")
+	}
+}
+
+func TestSet_EmptyBitset(t *testing.T) {
+	bs := NewBitset()
+
+	err := bs.Set(0, true)
+	if err == nil {
+		t.Fatal("expected error for empty bitset, got nil")
+	}
+}

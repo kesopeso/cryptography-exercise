@@ -24,21 +24,36 @@ func NewBitset() *Bitset {
 // Add appends a boolean value to the Bitset. A new byte is allocated when the
 // current byte is full. Panics if the internal data length is inconsistent with
 // the expected size.
-func (s *Bitset) Add(value bool) {
-	byteIndex := s.size / 8
-	bitIndex := s.size % 8
+func (b *Bitset) Add(value bool) {
+	bitIndex := b.size % 8
 
 	if bitIndex == 0 {
-		s.data = append(s.data, 0)
+		b.data = append(b.data, 0)
 	}
 
-	assert.True(len(s.data) == byteIndex+1, fmt.Sprintf("data length missmatch, required: %d, actual: %d", byteIndex+1, len(s.data)))
+	byteIndex := b.size / 8
+	assert.True(len(b.data) == byteIndex+1, fmt.Sprintf("inconsistent data, bytes count %d, size %d", len(b.data), b.size))
 
-	s.size++
+	b.size++
+	err := b.Set(b.size-1, value)
+	assert.NoError(err)
+}
 
-	if !value {
-		return
+// Set updates the boolean value at the given index. Returns an error if the
+// index is out of bounds.
+func (b *Bitset) Set(index int, value bool) error {
+	if index < 0 || index > b.size-1 {
+		return fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
 	}
 
-	s.data[byteIndex] |= (1 << bitIndex)
+	byteIndex := index / 8
+	bitIndex := index % 8
+
+	if value {
+		b.data[byteIndex] |= (1 << bitIndex)
+	} else {
+		b.data[byteIndex] &= ^(1 << bitIndex)
+	}
+
+	return nil
 }
