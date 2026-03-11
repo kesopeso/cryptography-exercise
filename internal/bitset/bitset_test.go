@@ -1,6 +1,12 @@
 package bitset
 
-import "testing"
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"io"
+	"testing"
+)
 
 func TestNewBitset(t *testing.T) {
 	bs := NewBitset()
@@ -219,5 +225,168 @@ func TestSet_EmptyBitset(t *testing.T) {
 	err := bs.Set(0, true)
 	if err == nil {
 		t.Fatal("expected error for empty bitset, got nil")
+	}
+}
+
+// decodeEncoded is a test helper that base64-decodes and gunzips an encoded string.
+func decodeEncoded(t *testing.T, encoded string) []byte {
+	t.Helper()
+	compressed, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("base64 decode error: %v", err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		t.Fatalf("gzip reader error: %v", err)
+	}
+	defer gz.Close()
+	data, err := io.ReadAll(gz)
+	if err != nil {
+		t.Fatalf("gzip read error: %v", err)
+	}
+	return data
+}
+
+func TestEncode_UsesGzipCompression(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	compressed, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("base64 decode error: %v", err)
+	}
+
+	if len(compressed) < 2 {
+		t.Fatal("compressed data too short to contain gzip header")
+	}
+	if compressed[0] != 0x1f || compressed[1] != 0x8b {
+		t.Errorf("gzip magic header = [%#x, %#x], want [0x1f, 0x8b]", compressed[0], compressed[1])
+	}
+}
+
+func TestEncode_ReturnsValidBase64(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	_, err = base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("result is not valid base64: %v", err)
+	}
+}
+
+func TestEncode_EmptyBitset(t *testing.T) {
+	bs := NewBitset()
+
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	data := decodeEncoded(t, encoded)
+	// Empty bitset: no data bytes, just sentinel byte 0x01
+	if len(data) != 1 || data[0] != 0x01 {
+		t.Errorf("data = %v, want [00000001]", data)
+	}
+}
+
+func TestEncode_SentinelBitPartialByte(t *testing.T) {
+	bs := NewBitset()
+	// 3 bits: true, false, true -> data = 00000101
+	// With sentinel at bit 3: 00001101
+	bs.Add(true)
+	bs.Add(false)
+	bs.Add(true)
+
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	data := decodeEncoded(t, encoded)
+	if len(data) != 1 {
+		t.Fatalf("data length = %d, want 1", len(data))
+	}
+	if data[0] != 0x0D {
+		t.Errorf("data[0] = %08b, want 00001101", data[0])
+	}
+}
+
+func TestEncode_SentinelBitFullByte(t *testing.T) {
+	bs := NewBitset()
+	// 8 bits all true -> data = 0xFF
+	// Sentinel in new byte: 0x01
+	for range 8 {
+		bs.Add(true)
+	}
+
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	data := decodeEncoded(t, encoded)
+	if len(data) != 2 {
+		t.Fatalf("data length = %d, want 2", len(data))
+	}
+	if data[0] != 0xFF {
+		t.Errorf("data[0] = %08b, want 11111111", data[0])
+	}
+	if data[1] != 0x01 {
+		t.Errorf("data[1] = %08b, want 00000001", data[1])
+	}
+}
+
+func TestEncode_DoesNotMutateOriginalData(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+	bs.Add(false)
+	bs.Add(true)
+
+	originalByte := bs.data[0]
+
+	_, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	if bs.data[0] != originalByte {
+		t.Errorf("data[0] mutated: got %08b, want %08b", bs.data[0], originalByte)
+	}
+	if bs.size != 3 {
+		t.Errorf("size mutated: got %d, want 3", bs.size)
+	}
+}
+
+func TestEncode_DifferentDataProducesDifferentOutput(t *testing.T) {
+	bs1 := NewBitset()
+	bs1.Add(true)
+	bs1.Add(false)
+
+	bs2 := NewBitset()
+	bs2.Add(false)
+	bs2.Add(true)
+
+	enc1, err := bs1.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	enc2, err := bs2.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	if enc1 == enc2 {
+		t.Error("different bitsets produced identical encoded output")
 	}
 }

@@ -31,7 +31,7 @@ func (b *Bitset) Add(value bool) {
 	bitIndex := b.size % 8
 
 	if bitIndex == 0 {
-		b.data = append(b.data, 0)
+		b.data = append(b.data, 0x00)
 	}
 
 	byteIndex := b.size / 8
@@ -61,13 +61,15 @@ func (b *Bitset) Set(index int, value bool) error {
 	return nil
 }
 
-// Encode returns the gzipped, base64-encoded string of the byte array
+// Encode compresses the bitset data with gzip and returns it as a base64-encoded string.
+// A sentinel bit is appended after the last data bit to preserve the exact size
+// for decoding.
 func (b *Bitset) Encode() (string, error) {
 	var buf bytes.Buffer
 
 	gz := gzip.NewWriter(&buf)
 
-	_, err := gz.Write(b.data)
+	_, err := gz.Write(b.getEncodeData())
 	if err != nil {
 		return "", err
 	}
@@ -77,4 +79,21 @@ func (b *Bitset) Encode() (string, error) {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+// getEncodeData returns a copy of the bitset data with a sentinel 1 bit appended
+// after the last data bit. When decoding, the highest set bit in the last byte
+// marks the sentinel — everything below it is actual data.
+func (b *Bitset) getEncodeData() []byte {
+	result := make([]byte, len(b.data))
+	copy(result, b.data)
+
+	remainder := b.size % 8
+	if remainder == 0 {
+		result = append(result, 0x01)
+	} else {
+		result[len(result)-1] |= (1 << remainder)
+	}
+
+	return result
 }
