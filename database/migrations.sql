@@ -10,3 +10,8 @@
 --      TABLESPACE = pg_default
 --      CONNECTION LIMIT = -1
 --      IS_TEMPLATE = False;
+
+CREATE TABLE statuses (
+    id SERIAL PRIMARY KEY,
+    encoded_status TEXT NOT NULL
+);
