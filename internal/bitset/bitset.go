@@ -66,6 +66,20 @@ func (b *Bitset) Set(index int, value bool) error {
 	return nil
 }
 
+// Get returns the boolean value at a given index. Returns an error if the
+// index is out of bounds.
+func (b *Bitset) Get(index int) (bool, error) {
+	if index < 0 || index > b.size-1 {
+		return false, fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
+	}
+
+	byteIndex := index / 8
+	bitIndex := index % 8
+
+	value := b.data[byteIndex]&(1<<bitIndex) != 0
+	return value, nil
+}
+
 // Encode compresses the bitset data with gzip and returns it as a base64-encoded string.
 // A sentinel bit is appended after the last data bit to preserve the exact size
 // for decoding.

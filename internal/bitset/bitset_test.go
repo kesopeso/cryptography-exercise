@@ -556,3 +556,68 @@ func TestDecode_InvalidGzip(t *testing.T) {
 		t.Fatal("expected error for invalid gzip, got nil")
 	}
 }
+
+func TestGet_ReturnsCorrectValues(t *testing.T) {
+	bs := NewBitset()
+	values := []bool{true, false, true, false, false, true, false, true}
+	for _, v := range values {
+		bs.Add(v)
+	}
+
+	for i, want := range values {
+		got, err := bs.Get(i)
+		if err != nil {
+			t.Fatalf("Get(%d) unexpected error: %v", i, err)
+		}
+		if got != want {
+			t.Errorf("Get(%d) = %v, want %v", i, got, want)
+		}
+	}
+}
+
+func TestGet_AcrossMultipleBytes(t *testing.T) {
+	bs := NewBitset()
+	values := []bool{true, false, true, false, true, false, true, false, false, true}
+	for _, v := range values {
+		bs.Add(v)
+	}
+
+	for i, want := range values {
+		got, err := bs.Get(i)
+		if err != nil {
+			t.Fatalf("Get(%d) unexpected error: %v", i, err)
+		}
+		if got != want {
+			t.Errorf("Get(%d) = %v, want %v", i, got, want)
+		}
+	}
+}
+
+func TestGet_NegativeIndex(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+
+	_, err := bs.Get(-1)
+	if err == nil {
+		t.Fatal("expected error for negative index, got nil")
+	}
+}
+
+func TestGet_IndexOutOfBounds(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+
+	_, err := bs.Get(1)
+	if err == nil {
+		t.Fatal("expected error for out of bounds index, got nil")
+	}
+}
+
+func TestGet_EmptyBitset(t *testing.T) {
+	bs := NewBitset()
+
+	_, err := bs.Get(0)
+	if err == nil {
+		t.Fatal("expected error for empty bitset, got nil")
+	}
+}
