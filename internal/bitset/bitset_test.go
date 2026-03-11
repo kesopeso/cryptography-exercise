@@ -390,3 +390,158 @@ func TestEncode_DifferentDataProducesDifferentOutput(t *testing.T) {
 		t.Error("different bitsets produced identical encoded output")
 	}
 }
+
+func encodeHelper(t *testing.T, bs *Bitset) string {
+	t.Helper()
+	encoded, err := bs.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+	return encoded
+}
+
+func assertBitsetEqual(t *testing.T, got *Bitset, wantData []byte, wantSize int) {
+	t.Helper()
+	if got.size != wantSize {
+		t.Errorf("size = %d, want %d", got.size, wantSize)
+	}
+	if len(got.data) != len(wantData) {
+		t.Errorf("data length = %d, want %d", len(got.data), len(wantData))
+		return
+	}
+	for i := range wantData {
+		if got.data[i] != wantData[i] {
+			t.Errorf("data[%d] = %08b, want %08b", i, got.data[i], wantData[i])
+		}
+	}
+}
+
+func TestDecode_EmptyBitset(t *testing.T) {
+	bs := NewBitset()
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{}, 0)
+}
+
+func TestDecode_SingleTrue(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(true)
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0x01}, 1)
+}
+
+func TestDecode_SingleFalse(t *testing.T) {
+	bs := NewBitset()
+	bs.Add(false)
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0x00}, 1)
+}
+
+func TestDecode_PartialByte(t *testing.T) {
+	bs := NewBitset()
+	// 3 bits: true, false, true
+	bs.Add(true)
+	bs.Add(false)
+	bs.Add(true)
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0x05}, 3)
+}
+
+func TestDecode_FullByte(t *testing.T) {
+	bs := NewBitset()
+	for range 8 {
+		bs.Add(true)
+	}
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0xFF}, 8)
+}
+
+func TestDecode_MultipleBytes(t *testing.T) {
+	bs := NewBitset()
+	for range 20 {
+		bs.Add(true)
+	}
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0xFF, 0xFF, 0x0F}, 20)
+}
+
+func TestDecode_AllFalse(t *testing.T) {
+	bs := NewBitset()
+	for range 16 {
+		bs.Add(false)
+	}
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, []byte{0x00, 0x00}, 16)
+}
+
+func TestDecode_RoundTripPreservesData(t *testing.T) {
+	bs := NewBitset()
+	values := []bool{true, false, true, true, false, false, true, false, true}
+	for _, v := range values {
+		bs.Add(v)
+	}
+	encoded := encodeHelper(t, bs)
+
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+
+	assertBitsetEqual(t, decoded, bs.data, bs.size)
+}
+
+func TestDecode_InvalidBase64(t *testing.T) {
+	_, err := Decode("not-valid-base64!@#")
+	if err == nil {
+		t.Fatal("expected error for invalid base64, got nil")
+	}
+}
+
+func TestDecode_InvalidGzip(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("not gzip data"))
+	_, err := Decode(encoded)
+	if err == nil {
+		t.Fatal("expected error for invalid gzip, got nil")
+	}
+}

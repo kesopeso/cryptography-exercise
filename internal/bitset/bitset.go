@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"math/bits"
 
 	"github.com/kesopeso/cryptography-exercise/internal/assert"
 )
@@ -79,6 +81,55 @@ func (b *Bitset) Encode() (string, error) {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+// Decode decodes a base64-encoded, gzip-compressed string back into a Bitset.
+// It locates the sentinel bit (highest set bit in the last byte), removes it,
+// and uses the remaining bits to reconstruct the original data and size.
+func Decode(encoded string) (*Bitset, error) {
+	compressed, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64: %w", err)
+	}
+
+	gz, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gz.Close()
+
+	raw, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decompress data: %w", err)
+	}
+
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("encoded data is empty")
+	}
+
+	lastByte := raw[len(raw)-1]
+	if lastByte == 0 {
+		return nil, fmt.Errorf("missing sentinel bit in last byte")
+	}
+
+	// Find the sentinel: highest set bit in the last byte
+	sentinelPos := bits.Len8(lastByte) - 1
+
+	// Clear the sentinel bit
+	raw[len(raw)-1] &= ^(1 << sentinelPos)
+
+	// Size = all bits in preceding bytes + bits below the sentinel in the last byte
+	size := (len(raw)-1)*8 + sentinelPos
+
+	// If sentinel was at bit 0 of the last byte, the last byte was purely sentinel
+	var data []byte
+	if sentinelPos == 0 {
+		data = raw[:len(raw)-1]
+	} else {
+		data = raw
+	}
+
+	return &Bitset{data: data, size: size}, nil
 }
 
 // getEncodeData returns a copy of the bitset data with a sentinel 1 bit appended
