@@ -16,12 +16,12 @@ func NewRouter(statusStore store.StatusStore) *chi.Mux {
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/status", func(r chi.Router) {
-		r.Get("/", h.listStatuses)
+		r.Get("/", h.getStatusIds)
 
 		r.Post("/", h.createStatus)
 
 		r.Route("/{statusId}", func(r chi.Router) {
-			r.Post("/", h.createState)
+			r.Post("/", h.createStatusValue)
 
 			r.Route("/{index}", func(r chi.Router) {
 				r.Get("/", h.getState)

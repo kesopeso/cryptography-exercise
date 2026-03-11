@@ -19,6 +19,17 @@ func TestNewBitset(t *testing.T) {
 	}
 }
 
+func TestAdd_ReturnsCorrectIndex(t *testing.T) {
+	bs := NewBitset()
+
+	for i := range 20 {
+		got := bs.Add(i%2 == 0)
+		if got != i {
+			t.Errorf("Add() = %d, want %d", got, i)
+		}
+	}
+}
+
 func TestAdd_SingleTrue(t *testing.T) {
 	bs := NewBitset()
 	bs.Add(true)

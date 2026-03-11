@@ -29,7 +29,8 @@ func NewBitset() *Bitset {
 // Add appends a boolean value to the Bitset. A new byte is allocated when the
 // current byte is full. Panics if the internal data length is inconsistent with
 // the expected size.
-func (b *Bitset) Add(value bool) {
+// Returns the index of newly added value.
+func (b *Bitset) Add(value bool) int {
 	bitIndex := b.size % 8
 
 	if bitIndex == 0 {
@@ -42,6 +43,8 @@ func (b *Bitset) Add(value bool) {
 	b.size++
 	err := b.Set(b.size-1, value)
 	assert.NoError(err)
+
+	return b.size - 1
 }
 
 // Set updates the boolean value at the given index. Returns an error if the

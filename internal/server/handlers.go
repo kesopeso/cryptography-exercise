@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
 	"github.com/kesopeso/cryptography-exercise/internal/store"
 )
@@ -49,7 +50,7 @@ func (h *statusHandlers) createStatus(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/status
 // Retrieve all structures (list of statusIds).
-func (h *statusHandlers) listStatuses(w http.ResponseWriter, r *http.Request) {
+func (h *statusHandlers) getStatusIds(w http.ResponseWriter, r *http.Request) {
 	ids, err := h.statusStore.GetStatusIds(r.Context())
 	if err != nil {
 		http.Error(w, "failed to list statuses", http.StatusInternalServerError)
@@ -67,8 +68,28 @@ func (h *statusHandlers) listStatuses(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/status/{statusId}
 // Create a new state in the structure and return the index.
-func (h *statusHandlers) createState(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+// Expects JSON body: { "value": true/false }
+func (h *statusHandlers) createStatusValue(w http.ResponseWriter, r *http.Request) {
+	statusId := chi.URLParam(r, "statusId")
+
+	var body struct {
+		Value bool `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	valueIndex, err := h.statusStore.CreateStatusValue(r.Context(), statusId, body.Value)
+	if err != nil {
+		http.Error(w, "failed to create status value", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]int{"valueIndex": valueIndex})
 }
 
 // GET /api/status/{statusId}/{index}

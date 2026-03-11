@@ -11,4 +11,5 @@ import (
 type StatusStore interface {
 	CreateStatus(ctx context.Context, status *bitset.Bitset) (uuid.UUID, error)
 	GetStatusIds(ctx context.Context) ([]uuid.UUID, error)
+	CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error)
 }
