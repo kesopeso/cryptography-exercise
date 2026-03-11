@@ -23,3 +23,44 @@ The structure should support:
 - Creating a new state within the list.
 - Encoding the entire list into a gzipped, Base64-encoded string.  
 encodedList: (return base64(gzip(byteArray)))
+
+## HTTP server implementation
+
+Program an HTTP server that serves JSON REST APIs through which you can create
+and manipulate the above data structure. Each list should be stored in a
+PostgreSQL database.
+
+The list of API calls should be as follows:
+
+- GET /api/status/:statusId/:index  
+The variable index is of type integer.  
+Returns a JWS compact signed message (the correctness of the JWS, signed JWT,
+can be verified here: [jwt.io](https://jwt.io)) with a JWK header and the
+following example payload:
+
+```json
+{
+    "iat": {{UNIX_time_now}}
+    "exp": {{UNIX_time_now + 1day}}
+    "iss": "http://{{domain}}/api/status/{{:statusId}}"
+    "status": {
+        "encodedList": {{encodedList}}
+        "index": {{:index}}
+    }
+}
+```
+
+- PUT /api/status/:statusId/:index  
+Set the state of {{:index}} in the structure {{:statusId}} to true.
+
+- DELETE /api/status/:statusId/:index  
+Set the state of {{:index}} in the structure {{:statusId}} to false.
+
+- POST /api/status/:statusId  
+Create a new state in the structure {{:statusId}} and return the index.
+
+- GET /api/status  
+Retrieve all structures (list of statusIds).
+
+- POST /api/status  
+Create a new structure and return the statusId of the newly created structure.
