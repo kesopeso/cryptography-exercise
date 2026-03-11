@@ -24,11 +24,11 @@ func NewRouter(statusStore store.StatusStore) *chi.Mux {
 			r.Post("/", h.createStatusValue)
 
 			r.Route("/{index}", func(r chi.Router) {
-				r.Get("/", h.getState)
+				r.Get("/", h.getStatusValue)
 
-				r.Put("/", h.setState)
+				r.Put("/", h.updateStatusValueToTrue)
 
-				r.Delete("/", h.deleteState)
+				r.Delete("/", h.updateStatusValueToFalse)
 			})
 		})
 	})

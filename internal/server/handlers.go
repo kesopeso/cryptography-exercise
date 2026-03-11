@@ -94,18 +94,18 @@ func (h *statusHandlers) createStatusValue(w http.ResponseWriter, r *http.Reques
 
 // GET /api/status/{statusId}/{index}
 // Return a JWS compact signed message with the status payload.
-func (h *statusHandlers) getState(w http.ResponseWriter, r *http.Request) {
+func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // PUT /api/status/{statusId}/{index}
 // Set the state at index to true.
-func (h *statusHandlers) setState(w http.ResponseWriter, r *http.Request) {
+func (h *statusHandlers) updateStatusValueToTrue(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // DELETE /api/status/{statusId}/{index}
 // Set the state at index to false.
-func (h *statusHandlers) deleteState(w http.ResponseWriter, r *http.Request) {
+func (h *statusHandlers) updateStatusValueToFalse(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
