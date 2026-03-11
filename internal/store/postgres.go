@@ -36,3 +36,23 @@ func (pss *PostgresStatusStore) CreateStatus(ctx context.Context, status *bitset
 
 	return id, nil
 }
+
+// GetStatusIds returns all status UUIDs from the database.
+func (pss *PostgresStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := pss.db.Query(ctx, "SELECT id FROM statuses")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, rows.Err()
+}

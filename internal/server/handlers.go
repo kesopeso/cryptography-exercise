@@ -50,7 +50,19 @@ func (h *statusHandlers) createStatus(w http.ResponseWriter, r *http.Request) {
 // GET /api/status
 // Retrieve all structures (list of statusIds).
 func (h *statusHandlers) listStatuses(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+	ids, err := h.statusStore.GetStatusIds(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list statuses", http.StatusInternalServerError)
+		return
+	}
+
+	statusIds := make([]string, len(ids))
+	for i, id := range ids {
+		statusIds[i] = id.String()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string][]string{"statusIds": statusIds})
 }
 
 // POST /api/status/{statusId}
