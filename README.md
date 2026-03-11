@@ -79,3 +79,18 @@ Retrieve all structures (list of statusIds).
 
 - POST /api/status  
 Create a new structure and return the statusId of the newly created structure.
+
+### Bonus implementation
+
+a) Write a function that accepts a URL as an argument (this is a HTTP GET API,
+e.g.: [http://localhost:8000/api/status/a_Q5JxCz/1](http://localhost:8000/api/status/a_Q5JxCz/1)),
+performs a call to this
+API, and receives a JWS (a signed JWT). Then, verify the signature of the
+received JWS (you can also verify the iat, exp, and iss headers), read the
+status from the payload, and finally return the boolean state (true or false) of
+the index within the encodedList.  
+b) Upgrade HTTP implementation task by adding authorization to all PUT, POST
+and DELETE HTTP methods (this can be basic via the Authorization header or
+something more advanced).  
+c) Encrypt the status lists in the database (the encryption method can be an
+AES password or by creating an RSA key).

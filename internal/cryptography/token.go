@@ -8,26 +8,31 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 )
 
-type statusField struct {
+type StatusField struct {
 	EncodedList string `json:"encodedList"`
 	Index       int    `json:"index"`
 }
 
-type statusClaims struct {
+type StatusClaims struct {
 	Iat    int64       `json:"iat"`
 	Exp    int64       `json:"exp"`
 	Iss    string      `json:"iss"`
-	Status statusField `json:"status"`
+	Status StatusField `json:"status"`
 }
 
+// SignStatusJWS signs a status payload as a JWS compact serialization using the
+// ECDSA private key at keyPath. The token includes iat (now), exp (now + 24h),
+// iss (issuer), and a status field containing the encodedList and index. The
+// public key is embedded in the JWS header as a JWK so verifiers can validate
+// the signature.
 func SignStatusJWS(keyPath string, issuer string, encodedList string, index int) (string, error) {
 	now := time.Now().Unix()
 
-	payload := statusClaims{
+	payload := StatusClaims{
 		Iat: now,
 		Exp: now + 24*60*60,
 		Iss: issuer,
-		Status: statusField{
+		Status: StatusField{
 			EncodedList: encodedList,
 			Index:       index,
 		},
@@ -73,4 +78,32 @@ func SignStatusJWS(keyPath string, issuer string, encodedList string, index int)
 	}
 
 	return compact, nil
+}
+
+// ParseAndGetClaimsFromStatusJWS parses a JWS compact serialization, extracts
+// the embedded JWK from the header, verifies the signature, and returns the
+// decoded StatusClaims.
+// Returns an error if the token is malformed, the JWK is missing, or the signature is invalid.
+func ParseAndGetClaimsFromStatusJWS(jws string) (StatusClaims, error) {
+	parsedJWS, err := jose.ParseSigned(jws, []jose.SignatureAlgorithm{jose.ES256})
+	if err != nil {
+		return StatusClaims{}, fmt.Errorf("failed to parse JWS: %w", err)
+	}
+
+	jwk := parsedJWS.Signatures[0].Header.JSONWebKey
+	if jwk == nil {
+		return StatusClaims{}, fmt.Errorf("missing jwk header")
+	}
+
+	payload, err := parsedJWS.Verify(jwk)
+	if err != nil {
+		return StatusClaims{}, fmt.Errorf("invalid signature: %w", err)
+	}
+
+	var claims StatusClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return StatusClaims{}, fmt.Errorf("failed to unmarshal claims: %w", err)
+	}
+
+	return claims, nil
 }
