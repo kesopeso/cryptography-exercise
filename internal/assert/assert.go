@@ -6,3 +6,10 @@ func True(cond bool, msg string) {
 		panic(msg)
 	}
 }
+
+// NoError panics with the error message if err is not nil.
+func NoError(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
+}
