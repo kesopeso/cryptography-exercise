@@ -1,4 +1,4 @@
 CREATE TABLE statuses (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     encoded_status TEXT NOT NULL
 );
