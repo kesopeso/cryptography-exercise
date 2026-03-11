@@ -12,23 +12,21 @@ import (
 )
 
 func main() {
+	cfg := loadConfig()
 	ctx := context.Background()
 
-	dbURL := "postgresql://postgres:postgres@localhost:5432/apidb?sslmode=disable"
-	conn, err := pgx.Connect(ctx, dbURL)
+	conn, err := pgx.Connect(ctx, cfg.dbURL)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
 
 	statusStore := store.NewPostgresStatusStore(conn)
-	keyPath := "./server.pem"
-	handler := server.NewRouter(statusStore, keyPath)
+	handler := server.NewRouter(statusStore, cfg.keyPath)
 
-	addr := ":8090"
-	httpServer := server.NewHttpServer(&http.Server{Addr: addr, Handler: handler})
+	httpServer := server.NewHttpServer(&http.Server{Addr: cfg.addr, Handler: handler})
 
-	fmt.Printf("server listening on %s\n", addr)
+	fmt.Printf("server listening on %s\n", cfg.addr)
 
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server shutdown error: %v", err)

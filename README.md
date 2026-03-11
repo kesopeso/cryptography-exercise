@@ -1,5 +1,10 @@
 # Cryptography exercise
 
+## Configuration
+
+Copy .env.example and rename it to .env. Modify configuration values and save the
+file.
+
 ## Database
 
 For convinience postgresql database and pgadmin are provided with docker
