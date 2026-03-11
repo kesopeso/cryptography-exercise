@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
@@ -101,11 +102,37 @@ func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) 
 // PUT /api/status/{statusId}/{index}
 // Set the state at index to true.
 func (h *statusHandlers) updateStatusValueToTrue(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+	statusId := chi.URLParam(r, "statusId")
+
+	index, err := strconv.Atoi(chi.URLParam(r, "index"))
+	if err != nil || index < 0 {
+		http.Error(w, "index must be a non-negative integer", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.statusStore.UpdateStatusValue(r.Context(), statusId, index, true); err != nil {
+		http.Error(w, "failed to update status value", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // DELETE /api/status/{statusId}/{index}
 // Set the state at index to false.
 func (h *statusHandlers) updateStatusValueToFalse(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+	statusId := chi.URLParam(r, "statusId")
+
+	index, err := strconv.Atoi(chi.URLParam(r, "index"))
+	if err != nil || index < 0 {
+		http.Error(w, "index must be a non-negative integer", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.statusStore.UpdateStatusValue(r.Context(), statusId, index, false); err != nil {
+		http.Error(w, "failed to update status value", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

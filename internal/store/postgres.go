@@ -100,3 +100,49 @@ func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId 
 
 	return valueIndex, nil
 }
+
+// UpdateStatusValue updates the value at the given index in the status bitset.
+// Uses a transaction with SELECT FOR UPDATE to prevent concurrent modifications.
+func (pss *PostgresStatusStore) UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error {
+	id, err := uuid.Parse(statusId)
+	if err != nil {
+		return fmt.Errorf("invalid status id: %w", err)
+	}
+
+	tx, err := pss.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var encodedStatus string
+	err = tx.QueryRow(ctx, "SELECT encoded_status FROM statuses WHERE id = $1 FOR UPDATE", id).Scan(&encodedStatus)
+	if err != nil {
+		return fmt.Errorf("failed to fetch status: %w", err)
+	}
+
+	bs, err := bitset.Decode(encodedStatus)
+	if err != nil {
+		return fmt.Errorf("failed to decode status: %w", err)
+	}
+
+	if err := bs.Set(index, value); err != nil {
+		return fmt.Errorf("failed to set status value: %w", err)
+	}
+
+	encodedBs, err := bs.Encode()
+	if err != nil {
+		return fmt.Errorf("failed to encode status: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1 WHERE id = $2", encodedBs, id)
+	if err != nil {
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}

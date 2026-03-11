@@ -18,6 +18,7 @@ type mockStatusStore struct {
 	createStatusFn      func(ctx context.Context, status *bitset.Bitset) (uuid.UUID, error)
 	getStatusIdsFn      func(ctx context.Context) ([]uuid.UUID, error)
 	createStatusValueFn func(ctx context.Context, statusId string, value bool) (int, error)
+	updateStatusValueFn func(ctx context.Context, statusId string, index int, value bool) error
 }
 
 func (m *mockStatusStore) CreateStatus(ctx context.Context, status *bitset.Bitset) (uuid.UUID, error) {
@@ -30,6 +31,10 @@ func (m *mockStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, error)
 
 func (m *mockStatusStore) CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error) {
 	return m.createStatusValueFn(ctx, statusId, value)
+}
+
+func (m *mockStatusStore) UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error {
+	return m.updateStatusValueFn(ctx, statusId, index, value)
 }
 
 func TestCreateStatus(t *testing.T) {
@@ -180,10 +185,13 @@ func TestListStatuses(t *testing.T) {
 	}
 }
 
-// withChiURLParam adds a chi URL parameter to the request context.
-func withChiURLParam(r *http.Request, key, value string) *http.Request {
+// withChiURLParams adds chi URL parameters to the request context.
+// Accepts alternating key-value pairs.
+func withChiURLParams(r *http.Request, kvs ...string) *http.Request {
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add(key, value)
+	for i := 0; i < len(kvs)-1; i += 2 {
+		rctx.URLParams.Add(kvs[i], kvs[i+1])
+	}
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
@@ -254,7 +262,7 @@ func TestCreateStatusValue(t *testing.T) {
 			h := newStatusHandlers(tt.store)
 
 			req := httptest.NewRequest(http.MethodPost, "/api/status/"+tt.statusId, strings.NewReader(tt.body))
-			req = withChiURLParam(req, "statusId", tt.statusId)
+			req = withChiURLParams(req, "statusId", tt.statusId)
 			rec := httptest.NewRecorder()
 
 			h.createStatusValue(rec, req)
@@ -271,6 +279,179 @@ func TestCreateStatusValue(t *testing.T) {
 				if resp["valueIndex"] != tt.wantIndex {
 					t.Errorf("got valueIndex %d, want %d", resp["valueIndex"], tt.wantIndex)
 				}
+			}
+		})
+	}
+}
+
+func TestUpdateStatusValueToFalse(t *testing.T) {
+	statusId := "01961234-5678-7abc-8def-0123456789ab"
+
+	tests := []struct {
+		name           string
+		statusId       string
+		index          string
+		store          *mockStatusStore
+		wantStatusCode int
+	}{
+		{
+			name:     "valid request",
+			statusId: statusId,
+			index:    "3",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, gotStatusId string, gotIndex int, gotValue bool) error {
+					if gotStatusId != statusId {
+						t.Errorf("got statusId %q, want %q", gotStatusId, statusId)
+					}
+					if gotIndex != 3 {
+						t.Errorf("got index %d, want 3", gotIndex)
+					}
+					if gotValue {
+						t.Error("got value true, want false")
+					}
+					return nil
+				},
+			},
+			wantStatusCode: http.StatusNoContent,
+		},
+		{
+			name:     "index zero is valid",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, _ string, gotIndex int, _ bool) error {
+					if gotIndex != 0 {
+						t.Errorf("got index %d, want 0", gotIndex)
+					}
+					return nil
+				},
+			},
+			wantStatusCode: http.StatusNoContent,
+		},
+		{
+			name:           "negative index",
+			statusId:       statusId,
+			index:          "-1",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:           "non-numeric index",
+			statusId:       statusId,
+			index:          "abc",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:     "store error",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, _ string, _ int, _ bool) error {
+					return errors.New("db error")
+				},
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newStatusHandlers(tt.store)
+
+			req := httptest.NewRequest(http.MethodDelete, "/api/status/"+tt.statusId+"/"+tt.index, nil)
+			req = withChiURLParams(req, "statusId", tt.statusId, "index", tt.index)
+			rec := httptest.NewRecorder()
+
+			h.updateStatusValueToFalse(rec, req)
+
+			if rec.Code != tt.wantStatusCode {
+				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatusCode)
+			}
+		})
+	}
+}
+
+func TestUpdateStatusValueToTrue(t *testing.T) {
+	statusId := "01961234-5678-7abc-8def-0123456789ab"
+
+	tests := []struct {
+		name           string
+		statusId       string
+		index          string
+		store          *mockStatusStore
+		wantStatusCode int
+	}{
+		{
+			name:     "valid request",
+			statusId: statusId,
+			index:    "3",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, gotStatusId string, gotIndex int, gotValue bool) error {
+					if gotStatusId != statusId {
+						t.Errorf("got statusId %q, want %q", gotStatusId, statusId)
+					}
+					if gotIndex != 3 {
+						t.Errorf("got index %d, want 3", gotIndex)
+					}
+					if !gotValue {
+						t.Error("got value false, want true")
+					}
+					return nil
+				},
+			},
+			wantStatusCode: http.StatusNoContent,
+		},
+		{
+			name:     "index zero is valid",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, _ string, _ int, _ bool) error {
+					return nil
+				},
+			},
+			wantStatusCode: http.StatusNoContent,
+		},
+		{
+			name:           "negative index",
+			statusId:       statusId,
+			index:          "-1",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:           "non-numeric index",
+			statusId:       statusId,
+			index:          "abc",
+			store:          &mockStatusStore{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:     "store error",
+			statusId: statusId,
+			index:    "0",
+			store: &mockStatusStore{
+				updateStatusValueFn: func(_ context.Context, _ string, _ int, _ bool) error {
+					return errors.New("db error")
+				},
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newStatusHandlers(tt.store)
+
+			req := httptest.NewRequest(http.MethodPut, "/api/status/"+tt.statusId+"/"+tt.index, nil)
+			req = withChiURLParams(req, "statusId", tt.statusId, "index", tt.index)
+			rec := httptest.NewRecorder()
+
+			h.updateStatusValueToTrue(rec, req)
+
+			if rec.Code != tt.wantStatusCode {
+				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatusCode)
 			}
 		})
 	}
