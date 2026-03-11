@@ -3,28 +3,32 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/kesopeso/cryptography-exercise/internal/store"
 )
 
-func NewRouter() *chi.Mux {
+// NewRouter creates a chi router with logging, middleware,
+// and all status API routes registered.
+func NewRouter(statusStore store.StatusStore) *chi.Mux {
 	r := chi.NewRouter()
+	h := newStatusHandlers(statusStore)
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/status", func(r chi.Router) {
-		r.Get("/", listStatuses)
+		r.Get("/", h.listStatuses)
 
-		r.Post("/", createStatus)
+		r.Post("/", h.createStatus)
 
 		r.Route("/{statusId}", func(r chi.Router) {
-			r.Post("/", createState)
+			r.Post("/", h.createState)
 
 			r.Route("/{index}", func(r chi.Router) {
-				r.Get("/", getState)
+				r.Get("/", h.getState)
 
-				r.Put("/", setState)
+				r.Put("/", h.setState)
 
-				r.Delete("/", deleteState)
+				r.Delete("/", h.deleteState)
 			})
 		})
 	})
