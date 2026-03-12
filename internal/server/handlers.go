@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -42,7 +43,7 @@ func (h *statusHandlers) createStatus(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.statusStore.CreateStatus(r.Context(), bs)
 	if err != nil {
-		http.Error(w, "failed to create status", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("failed to create status, error: %v", err), http.StatusInternalServerError)
 		return
 	}
 

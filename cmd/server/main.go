@@ -21,7 +21,7 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	statusStore := store.NewPostgresStatusStore(conn)
+	statusStore := store.NewPostgresStatusStore(conn, cfg.aesPassword)
 	handler := server.NewRouter(statusStore, cfg.keyPath, cfg.authToken)
 
 	httpServer := server.NewHttpServer(&http.Server{Addr: cfg.addr, Handler: handler})

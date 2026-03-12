@@ -7,16 +7,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
+	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
 )
 
 // PostgresStatusStore implements StatusStore using a PostgreSQL connection.
 type PostgresStatusStore struct {
-	db *pgx.Conn
+	db          *pgx.Conn
+	aesPassword string
 }
 
-// NewPostgresStatusStore creates a PostgresStatusStore with the given database connection.
-func NewPostgresStatusStore(db *pgx.Conn) *PostgresStatusStore {
-	return &PostgresStatusStore{db: db}
+// NewPostgresStatusStore creates a PostgresStatusStore with the given parameters.
+func NewPostgresStatusStore(db *pgx.Conn, aesPassword string) *PostgresStatusStore {
+	return &PostgresStatusStore{db: db, aesPassword: aesPassword}
 }
 
 // CreateStatus inserts a new status row with UUID v7 and encoded values from Bitset.
@@ -32,7 +34,12 @@ func (pss *PostgresStatusStore) CreateStatus(ctx context.Context, status *bitset
 		return uuid.UUID{}, err
 	}
 
-	_, err = pss.db.Exec(ctx, "INSERT INTO statuses (id, encoded_status) VALUES ($1, $2)", id, encodedStatus)
+	encryptedStatus, err := cryptography.AESEncrypt(encodedStatus, pss.aesPassword)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	_, err = pss.db.Exec(ctx, "INSERT INTO statuses (id, encoded_status, encrypted_status) VALUES ($1, $2, $3)", id, encodedStatus, encryptedStatus)
 	if err != nil {
 		return uuid.UUID{}, err
 	}
@@ -108,7 +115,12 @@ func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId 
 		return -1, fmt.Errorf("failed to encode status: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1 WHERE id = $2", encodedBs, id)
+	encryptedBs, err := cryptography.AESEncrypt(encodedBs, pss.aesPassword)
+	if err != nil {
+		return -1, fmt.Errorf("failed to encrypt status: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1, encrypted_status = $2 WHERE id = $3", encodedBs, encryptedBs, id)
 
 	if err := tx.Commit(ctx); err != nil {
 		return -1, fmt.Errorf("failed to commit transaction: %w", err)
@@ -151,7 +163,12 @@ func (pss *PostgresStatusStore) UpdateStatusValue(ctx context.Context, statusId 
 		return fmt.Errorf("failed to encode status: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1 WHERE id = $2", encodedBs, id)
+	encryptedBs, err := cryptography.AESEncrypt(encodedBs, pss.aesPassword)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt status: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1, encrypted_status = $2 WHERE id = $3", encodedBs, encryptedBs, id)
 	if err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
