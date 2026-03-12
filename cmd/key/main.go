@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 func main() {

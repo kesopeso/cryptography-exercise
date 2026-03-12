@@ -1,4 +1,4 @@
-package server
+package api_test
 
 import (
 	"encoding/json"
@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
+	"github.com/kesopeso/cryptography-exercise/pkg/api"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 func TestGetJWSTokenAndReturnStatusValue(t *testing.T) {
@@ -56,7 +57,7 @@ func TestGetJWSTokenAndReturnStatusValue(t *testing.T) {
 			t.Fatalf("failed signing status JWS: %v", err)
 		}
 
-		resultValue, err := GetJWSTokenAndReturnStatusValue(http.DefaultClient, server.URL+apiPath)
+		resultValue, err := api.GetJWSTokenAndReturnStatusValue(http.DefaultClient, server.URL+apiPath)
 		if err != nil {
 			t.Fatalf("function failed: %v", err)
 		}

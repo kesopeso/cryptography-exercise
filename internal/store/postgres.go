@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/assert"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 // PostgresStatusStore implements StatusStore using a PostgreSQL connection.

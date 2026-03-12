@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
 	"github.com/kesopeso/cryptography-exercise/internal/store"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 // statusHandlers holds dependencies for the status API route handlers.

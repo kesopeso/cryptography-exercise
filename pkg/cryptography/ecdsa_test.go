@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 func TestGenerateAndSaveECDSAKey(t *testing.T) {

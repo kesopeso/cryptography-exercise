@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
-	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
+	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 // GetJWSTokenAndReturnStatusValue calls url defined in getJWSTokenURL parameter,
