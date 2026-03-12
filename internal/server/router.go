@@ -8,9 +8,10 @@ import (
 
 // NewRouter creates a chi router with logging, middleware,
 // and all status API routes registered.
-func NewRouter(statusStore store.StatusStore, keyPath string) *chi.Mux {
+func NewRouter(statusStore store.StatusStore, keyPath string, authToken string) *chi.Mux {
 	r := chi.NewRouter()
 	h := newStatusHandlers(statusStore, keyPath)
+	authMiddleware := bearerAuth(authToken)
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -18,17 +19,17 @@ func NewRouter(statusStore store.StatusStore, keyPath string) *chi.Mux {
 	r.Route("/api/status", func(r chi.Router) {
 		r.Get("/", h.getStatusIds)
 
-		r.Post("/", h.createStatus)
+		r.With(authMiddleware).Post("/", h.createStatus)
 
 		r.Route("/{statusId}", func(r chi.Router) {
-			r.Post("/", h.createStatusValue)
+			r.With(authMiddleware).Post("/", h.createStatusValue)
 
 			r.Route("/{index}", func(r chi.Router) {
 				r.Get("/", h.getStatusValue)
 
-				r.Put("/", h.updateStatusValueToTrue)
+				r.With(authMiddleware).Put("/", h.updateStatusValueToTrue)
 
-				r.Delete("/", h.updateStatusValueToFalse)
+				r.With(authMiddleware).Delete("/", h.updateStatusValueToFalse)
 			})
 		})
 	})

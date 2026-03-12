@@ -8,9 +8,10 @@ import (
 )
 
 type config struct {
-	dbURL   string
-	keyPath string
-	addr    string
+	dbURL     string
+	keyPath   string
+	addr      string
+	authToken string
 }
 
 func loadConfig() config {
@@ -19,9 +20,10 @@ func loadConfig() config {
 	}
 
 	return config{
-		dbURL:   getEnv("DB_URL"),
-		keyPath: getEnv("KEY_PATH"),
-		addr:    getEnv("SERVER_ADDRESS"),
+		dbURL:     getEnv("DB_URL"),
+		keyPath:   getEnv("KEY_PATH"),
+		addr:      getEnv("SERVER_ADDRESS"),
+		authToken: getEnv("AUTH_TOKEN"),
 	}
 }
 
