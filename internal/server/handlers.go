@@ -7,20 +7,19 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kesopeso/cryptography-exercise/internal/bitset"
-	"github.com/kesopeso/cryptography-exercise/internal/store"
+	"github.com/kesopeso/cryptography-exercise/internal/service"
 	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
 // statusHandlers holds dependencies for the status API route handlers.
 type statusHandlers struct {
-	statusStore    store.StatusStore
+	statusService  service.StatusService
 	signJWSKeyPath string
 }
 
-// newStatusHandlers creates a statusHandlers with the given StatusStore and signing key path.
-func newStatusHandlers(statusStore store.StatusStore, signJWSKeyPath string) *statusHandlers {
-	return &statusHandlers{statusStore: statusStore, signJWSKeyPath: signJWSKeyPath}
+// newStatusHandlers creates a statusHandlers with the given StatusService and signing key path.
+func newStatusHandlers(statusService service.StatusService, signJWSKeyPath string) *statusHandlers {
+	return &statusHandlers{statusService: statusService, signJWSKeyPath: signJWSKeyPath}
 }
 
 // POST /api/status
@@ -36,12 +35,7 @@ func (h *statusHandlers) createStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bs := bitset.NewBitset()
-	for _, v := range body.Status {
-		bs.Add(v)
-	}
-
-	id, err := h.statusStore.CreateStatus(r.Context(), bs)
+	id, err := h.statusService.CreateStatus(r.Context(), body.Status)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to create status, error: %v", err), http.StatusInternalServerError)
 		return
@@ -55,7 +49,7 @@ func (h *statusHandlers) createStatus(w http.ResponseWriter, r *http.Request) {
 // GET /api/status
 // Retrieve all structures (list of statusIds).
 func (h *statusHandlers) getStatusIds(w http.ResponseWriter, r *http.Request) {
-	ids, err := h.statusStore.GetStatusIds(r.Context())
+	ids, err := h.statusService.GetStatusIds(r.Context())
 	if err != nil {
 		http.Error(w, "failed to list statuses", http.StatusInternalServerError)
 		return
@@ -85,7 +79,7 @@ func (h *statusHandlers) createStatusValue(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	valueIndex, err := h.statusStore.CreateStatusValue(r.Context(), statusId, body.Value)
+	valueIndex, err := h.statusService.CreateStatusValue(r.Context(), statusId, body.Value)
 	if err != nil {
 		http.Error(w, "failed to create status value", http.StatusInternalServerError)
 		return
@@ -107,7 +101,7 @@ func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	encodedList, err := h.statusStore.GetEncodedStatus(r.Context(), statusId)
+	encodedList, err := h.statusService.GetEncodedStatus(r.Context(), statusId)
 	if err != nil {
 		http.Error(w, "failed to get status", http.StatusNotFound)
 		return
@@ -136,7 +130,7 @@ func (h *statusHandlers) updateStatusValueToTrue(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := h.statusStore.UpdateStatusValue(r.Context(), statusId, index, true); err != nil {
+	if err := h.statusService.UpdateStatusValue(r.Context(), statusId, index, true); err != nil {
 		http.Error(w, "failed to update status value", http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +149,7 @@ func (h *statusHandlers) updateStatusValueToFalse(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := h.statusStore.UpdateStatusValue(r.Context(), statusId, index, false); err != nil {
+	if err := h.statusService.UpdateStatusValue(r.Context(), statusId, index, false); err != nil {
 		http.Error(w, "failed to update status value", http.StatusInternalServerError)
 		return
 	}

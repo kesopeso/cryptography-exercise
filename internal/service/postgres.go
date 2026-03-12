@@ -1,4 +1,4 @@
-package store
+package service
 
 import (
 	"context"
@@ -11,26 +11,31 @@ import (
 	"github.com/kesopeso/cryptography-exercise/pkg/cryptography"
 )
 
-// PostgresStatusStore implements StatusStore using a PostgreSQL connection.
-type PostgresStatusStore struct {
+// PostgresStatusService implements StatusService using a PostgreSQL connection.
+type PostgresStatusService struct {
 	db          *pgx.Conn
 	aesPassword string
 }
 
-// NewPostgresStatusStore creates a PostgresStatusStore with the given parameters.
-func NewPostgresStatusStore(db *pgx.Conn, aesPassword string) *PostgresStatusStore {
-	return &PostgresStatusStore{db: db, aesPassword: aesPassword}
+// NewPostgresStatusService creates a PostgresStatusService with the given parameters.
+func NewPostgresStatusService(db *pgx.Conn, aesPassword string) *PostgresStatusService {
+	return &PostgresStatusService{db: db, aesPassword: aesPassword}
 }
 
-// CreateStatus inserts a new status row with UUID v7 and encoded values from Bitset.
+// CreateStatus inserts a new status row with UUID v7 and encoded values from status parameter.
 // Returns the generated UUID.
-func (pss *PostgresStatusStore) CreateStatus(ctx context.Context, status *bitset.Bitset) (uuid.UUID, error) {
+func (pss *PostgresStatusService) CreateStatus(ctx context.Context, status []bool) (uuid.UUID, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return uuid.UUID{}, err
 	}
 
-	encodedStatus, err := status.Encode()
+	bs := bitset.NewBitset()
+	for _, v := range status {
+		bs.Add(v)
+	}
+
+	encodedStatus, err := bs.Encode()
 	if err != nil {
 		return uuid.UUID{}, err
 	}
@@ -49,7 +54,7 @@ func (pss *PostgresStatusStore) CreateStatus(ctx context.Context, status *bitset
 }
 
 // GetStatusIds returns all status UUIDs from the database.
-func (pss *PostgresStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, error) {
+func (pss *PostgresStatusService) GetStatusIds(ctx context.Context) ([]uuid.UUID, error) {
 	rows, err := pss.db.Query(ctx, "SELECT id FROM statuses")
 	if err != nil {
 		return nil, err
@@ -69,7 +74,7 @@ func (pss *PostgresStatusStore) GetStatusIds(ctx context.Context) ([]uuid.UUID, 
 }
 
 // GetEncodedStatus returns the encoded status string for the given statusId.
-func (pss *PostgresStatusStore) GetEncodedStatus(ctx context.Context, statusId string) (string, error) {
+func (pss *PostgresStatusService) GetEncodedStatus(ctx context.Context, statusId string) (string, error) {
 	id, err := uuid.Parse(statusId)
 	if err != nil {
 		return "", fmt.Errorf("invalid status id: %w", err)
@@ -116,7 +121,7 @@ func (pss *PostgresStatusStore) GetEncodedStatus(ctx context.Context, statusId s
 
 // CreateStatusValue adds new status value to the existing database status row.
 // Returns the index of the newly added value.
-func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error) {
+func (pss *PostgresStatusService) CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error) {
 	id, err := uuid.Parse(statusId)
 	if err != nil {
 		return -1, fmt.Errorf("invalid status id: %w", err)
@@ -165,7 +170,7 @@ func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId 
 
 // UpdateStatusValue updates the value at the given index in the status bitset.
 // Uses a transaction with SELECT FOR UPDATE to prevent concurrent modifications.
-func (pss *PostgresStatusStore) UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error {
+func (pss *PostgresStatusService) UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error {
 	id, err := uuid.Parse(statusId)
 	if err != nil {
 		return fmt.Errorf("invalid status id: %w", err)
