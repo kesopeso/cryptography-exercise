@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/kesopeso/cryptography-exercise/internal/assert"
 	"github.com/kesopeso/cryptography-exercise/internal/bitset"
 	"github.com/kesopeso/cryptography-exercise/internal/cryptography"
 )
@@ -74,13 +75,43 @@ func (pss *PostgresStatusStore) GetEncodedStatus(ctx context.Context, statusId s
 		return "", fmt.Errorf("invalid status id: %w", err)
 	}
 
-	var encodedStatus string
-	err = pss.db.QueryRow(ctx, "SELECT encoded_status FROM statuses WHERE id = $1", id).Scan(&encodedStatus)
+	tx, err := pss.db.Begin(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch status: %w", err)
+		return "", fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var encodedStatus string
+	var encryptedStatus []byte
+	err = tx.QueryRow(ctx, "SELECT encoded_status, encrypted_status FROM statuses WHERE id = $1 FOR UPDATE", id).Scan(&encodedStatus, &encryptedStatus)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch statuses: %w", err)
 	}
 
-	return encodedStatus, nil
+	if len(encryptedStatus) == 0 {
+		encryptedStatus, err = cryptography.AESEncrypt(encodedStatus, pss.aesPassword)
+		if err != nil {
+			return "", fmt.Errorf("failed to encrypt encoded field: %w", err)
+		}
+
+		_, err = tx.Exec(ctx, "UPDATE statuses SET encrypted_status = $1 WHERE id = $2", encryptedStatus, id)
+		if err != nil {
+			return "", fmt.Errorf("failed to sync encrypted_status field: %w", err)
+		}
+	}
+
+	derivedEncodedStatus, err := cryptography.AESDecrypt(encryptedStatus, pss.aesPassword)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive encoded status: %w", err)
+	}
+
+	assert.True(encodedStatus == derivedEncodedStatus, fmt.Sprintf("encoded status %s, derived encoded status %s", encodedStatus, derivedEncodedStatus))
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return derivedEncodedStatus, nil
 }
 
 // CreateStatusValue adds new status value to the existing database status row.
@@ -121,6 +152,9 @@ func (pss *PostgresStatusStore) CreateStatusValue(ctx context.Context, statusId 
 	}
 
 	_, err = tx.Exec(ctx, "UPDATE statuses SET encoded_status = $1, encrypted_status = $2 WHERE id = $3", encodedBs, encryptedBs, id)
+	if err != nil {
+		return -1, fmt.Errorf("failed to update status row: %w", err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return -1, fmt.Errorf("failed to commit transaction: %w", err)
