@@ -81,7 +81,7 @@ func (h *statusHandlers) createStatusValue(w http.ResponseWriter, r *http.Reques
 
 	valueIndex, err := h.statusService.CreateStatusValue(r.Context(), statusId, body.Value)
 	if err != nil {
-		http.Error(w, "failed to create status value", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("failed to create status value, %v", err), http.StatusInternalServerError)
 		return
 	}
 

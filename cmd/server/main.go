@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/kesopeso/cryptography-exercise/internal/server"
 	"github.com/kesopeso/cryptography-exercise/internal/service"
+	"github.com/kesopeso/cryptography-exercise/internal/store"
 )
 
 func main() {
@@ -21,7 +22,8 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	statusService := service.NewPostgresStatusService(conn, cfg.aesPassword)
+	statusStore := store.NewPostgresStatusStore(conn)
+	statusService := service.NewDefaultStatusService(statusStore, cfg.aesPassword)
 	handler := server.NewRouter(statusService, cfg.keyPath, cfg.authToken)
 
 	httpServer := server.NewHttpServer(&http.Server{Addr: cfg.addr, Handler: handler})
