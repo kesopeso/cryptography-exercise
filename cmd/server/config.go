@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -17,7 +17,7 @@ type config struct {
 
 func loadConfig() config {
 	if err := godotenv.Load(); err != nil {
-		panic(fmt.Sprintf("can't load .env file: %v", err))
+		log.Fatalf("can't load .env file: %v", err)
 	}
 
 	return config{
@@ -32,7 +32,7 @@ func loadConfig() config {
 func getEnv(key string) string {
 	value, ok := os.LookupEnv(key)
 	if !ok || value == "" {
-		panic(fmt.Sprintf("missing configuration variable %s", key))
+		log.Fatalf("missing configuration variable %s", key)
 	}
 	return value
 }
