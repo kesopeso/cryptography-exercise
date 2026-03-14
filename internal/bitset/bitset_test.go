@@ -621,3 +621,30 @@ func TestGet_EmptyBitset(t *testing.T) {
 		t.Fatal("expected error for empty bitset, got nil")
 	}
 }
+
+func TestValueExists(t *testing.T) {
+	bs := NewBitset()
+
+	checkIndex := []int{-5, 0, 2, 4}
+
+	// check empty list
+	expected := []bool{false, false, false, false}
+	for i, want := range expected {
+		got := bs.ValueExists(checkIndex[i])
+		if got != want {
+			t.Errorf("empty list ValueExists(%d) = %v, want %v", i, got, want)
+		}
+	}
+
+	// check list with values
+	bs.Add(false)
+	bs.Add(true)
+	bs.Add(false)
+	expected = []bool{false, true, true, false}
+	for i, want := range expected {
+		got := bs.ValueExists(checkIndex[i])
+		if got != want {
+			t.Errorf("non-empty list ValueExists(%d) = %v, want %v", i, got, want)
+		}
+	}
+}

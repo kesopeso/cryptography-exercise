@@ -53,7 +53,7 @@ func (b *Bitset) Add(value bool) int {
 // Set updates the boolean value at the given index. Returns an error if the
 // index is out of bounds.
 func (b *Bitset) Set(index int, value bool) error {
-	if index < 0 || index >= b.size {
+	if !b.ValueExists(index) {
 		return fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
 	}
 
@@ -72,7 +72,7 @@ func (b *Bitset) Set(index int, value bool) error {
 // Get returns the boolean value at a given index. Returns an error if the
 // index is out of bounds.
 func (b *Bitset) Get(index int) (bool, error) {
-	if index < 0 || index >= b.size {
+	if !b.ValueExists(index) {
 		return false, fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
 	}
 
@@ -81,6 +81,11 @@ func (b *Bitset) Get(index int) (bool, error) {
 
 	value := b.data[byteIndex]&(1<<bitIndex) != 0
 	return value, nil
+}
+
+// ValueExists checks if value at given index is defined
+func (b *Bitset) ValueExists(index int) bool {
+	return index >= 0 && index < b.size
 }
 
 // Encode compresses the bitset data with gzip and returns it as a base64-encoded string.
