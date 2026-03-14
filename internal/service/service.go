@@ -13,4 +13,5 @@ type StatusService interface {
 	GetEncodedStatus(ctx context.Context, statusId string) (string, error)
 	CreateStatusValue(ctx context.Context, statusId string, value bool) (int, error)
 	UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error
+	VerifyValueExists(index int, encodedStatus string) (bool, error)
 }

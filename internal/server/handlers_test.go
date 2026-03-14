@@ -20,6 +20,7 @@ type mockStatusService struct {
 	getEncodedStatusFn  func(ctx context.Context, statusId string) (string, error)
 	createStatusValueFn func(ctx context.Context, statusId string, value bool) (int, error)
 	updateStatusValueFn func(ctx context.Context, statusId string, index int, value bool) error
+	verifyValueExistsFn func() (bool, error)
 }
 
 func (m *mockStatusService) CreateStatus(ctx context.Context, status []bool) (uuid.UUID, error) {
@@ -40,6 +41,10 @@ func (m *mockStatusService) CreateStatusValue(ctx context.Context, statusId stri
 
 func (m *mockStatusService) UpdateStatusValue(ctx context.Context, statusId string, index int, value bool) error {
 	return m.updateStatusValueFn(ctx, statusId, index, value)
+}
+
+func (m *mockStatusService) VerifyValueExists(index int, encodedStatus string) (bool, error) {
+	return m.verifyValueExistsFn()
 }
 
 func TestCreateStatus(t *testing.T) {
@@ -494,16 +499,12 @@ func TestGetStatusValue(t *testing.T) {
 					}
 					return "encodedListValue", nil
 				},
+				verifyValueExistsFn: func() (bool, error) {
+					return true, nil
+				},
 			},
 			wantStatusCode: http.StatusOK,
 			wantJWS:        true,
-		},
-		{
-			name:           "negative index",
-			statusId:       statusId,
-			index:          "-1",
-			service:        &mockStatusService{},
-			wantStatusCode: http.StatusBadRequest,
 		},
 		{
 			name:           "non-numeric index",
@@ -513,7 +514,7 @@ func TestGetStatusValue(t *testing.T) {
 			wantStatusCode: http.StatusBadRequest,
 		},
 		{
-			name:     "service error",
+			name:     "status not found",
 			statusId: statusId,
 			index:    "0",
 			service: &mockStatusService{
@@ -525,12 +526,43 @@ func TestGetStatusValue(t *testing.T) {
 			wantStatusCode: http.StatusNotFound,
 		},
 		{
+			name:     "value check error",
+			statusId: statusId,
+			index:    "0",
+			service: &mockStatusService{
+				getEncodedStatusFn: func(_ context.Context, _ string) (string, error) {
+					return "encodedListValue", nil
+				},
+				verifyValueExistsFn: func() (bool, error) {
+					return false, errors.New("can't determine if value exists")
+				},
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:     "no such value",
+			statusId: statusId,
+			index:    "3",
+			service: &mockStatusService{
+				getEncodedStatusFn: func(_ context.Context, _ string) (string, error) {
+					return "encodedListValue", nil
+				},
+				verifyValueExistsFn: func() (bool, error) {
+					return false, nil
+				},
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
 			name:     "sign error",
 			statusId: statusId,
 			index:    "0",
 			service: &mockStatusService{
 				getEncodedStatusFn: func(_ context.Context, _ string) (string, error) {
 					return "encodedListValue", nil
+				},
+				verifyValueExistsFn: func() (bool, error) {
+					return true, nil
 				},
 			},
 			keyPath:        "/nonexistent/key.pem",

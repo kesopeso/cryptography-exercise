@@ -187,3 +187,11 @@ func (dss *DefaultStatusService) UpdateStatusValue(ctx context.Context, statusId
 		return nil
 	})
 }
+
+func (dss *DefaultStatusService) VerifyValueExists(index int, encodedStatus string) (bool, error) {
+	bs, err := bitset.Decode(encodedStatus)
+	if err != nil {
+		return false, fmt.Errorf("failed decoding status: %w", err)
+	}
+	return bs.ValueExists(index), nil
+}

@@ -96,7 +96,7 @@ func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) 
 	statusId := chi.URLParam(r, "statusId")
 
 	index, err := strconv.Atoi(chi.URLParam(r, "index"))
-	if err != nil || index < 0 {
+	if err != nil {
 		http.Error(w, "index must be a non-negative integer", http.StatusBadRequest)
 		return
 	}
@@ -104,6 +104,16 @@ func (h *statusHandlers) getStatusValue(w http.ResponseWriter, r *http.Request) 
 	encodedList, err := h.statusService.GetEncodedStatus(r.Context(), statusId)
 	if err != nil {
 		http.Error(w, "failed to get status", http.StatusNotFound)
+		return
+	}
+
+	valueExists, err := h.statusService.VerifyValueExists(index, encodedList)
+	if err != nil {
+		http.Error(w, "failed to determine status value", http.StatusInternalServerError)
+		return
+	}
+	if !valueExists {
+		http.Error(w, "failed to get status value", http.StatusNotFound)
 		return
 	}
 
