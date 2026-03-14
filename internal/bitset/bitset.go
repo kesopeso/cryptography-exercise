@@ -38,7 +38,7 @@ func (b *Bitset) Add(value bool) int {
 	}
 
 	byteIndex := b.size / 8
-	assert.True(len(b.data) == byteIndex+1, fmt.Sprintf("inconsistent data, bytes count %d, size %d", len(b.data), b.size))
+	assert.True(len(b.data) == byteIndex+1, "inconsistent data, bytes count %d, size %d", len(b.data), b.size)
 
 	b.size++
 	err := b.Set(b.size-1, value)

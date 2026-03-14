@@ -90,11 +90,9 @@ func (dss *DefaultStatusService) GetEncodedStatus(ctx context.Context, statusId 
 
 		assert.True(
 			status.EncodedStatus == derivedEncodedStatus,
-			fmt.Sprintf(
-				"encoded status %s, derived encoded status %s",
-				status.EncodedStatus,
-				derivedEncodedStatus,
-			),
+			"encoded status %s, derived encoded status %s",
+			status.EncodedStatus,
+			derivedEncodedStatus,
 		)
 
 		return nil

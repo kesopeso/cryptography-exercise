@@ -50,13 +50,14 @@ func TestNoError_PanicsWhenError(t *testing.T) {
 		if r == nil {
 			t.Fatal("expected panic, got nil")
 		}
-		msg, ok := r.(string)
+		err, ok := r.(error)
 		if !ok {
-			t.Fatalf("expected string panic, got %T", r)
+			t.Fatalf("expected error panic, got %T", r)
 		}
 		want := "something went wrong"
-		if msg != want {
-			t.Errorf("panic message = %q, want %q", msg, want)
+		got := err.Error()
+		if got != want {
+			t.Errorf("panic message = %q, want %q", got, want)
 		}
 	}()
 
