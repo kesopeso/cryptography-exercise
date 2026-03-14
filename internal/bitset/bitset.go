@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"math/bits"
@@ -40,17 +41,19 @@ func (b *Bitset) Add(value bool) int {
 	byteIndex := b.size / 8
 	assert.True(len(b.data) == byteIndex+1, "inconsistent data, bytes count %d, size %d", len(b.data), b.size)
 
+	index := b.size
 	b.size++
-	err := b.Set(b.size-1, value)
+
+	err := b.Set(index, value)
 	assert.NoError(err)
 
-	return b.size - 1
+	return index
 }
 
 // Set updates the boolean value at the given index. Returns an error if the
 // index is out of bounds.
 func (b *Bitset) Set(index int, value bool) error {
-	if index < 0 || index > b.size-1 {
+	if index < 0 || index >= b.size {
 		return fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
 	}
 
@@ -69,7 +72,7 @@ func (b *Bitset) Set(index int, value bool) error {
 // Get returns the boolean value at a given index. Returns an error if the
 // index is out of bounds.
 func (b *Bitset) Get(index int) (bool, error) {
-	if index < 0 || index > b.size-1 {
+	if index < 0 || index >= b.size {
 		return false, fmt.Errorf("index %d out of bounds, data size %d", index, b.size)
 	}
 
@@ -121,12 +124,12 @@ func Decode(encoded string) (*Bitset, error) {
 	}
 
 	if len(raw) == 0 {
-		return nil, fmt.Errorf("encoded data is empty")
+		return nil, errors.New("encoded data is empty")
 	}
 
 	lastByte := raw[len(raw)-1]
 	if lastByte == 0 {
-		return nil, fmt.Errorf("missing sentinel bit in last byte")
+		return nil, errors.New("missing sentinel bit in last byte")
 	}
 
 	// Find the sentinel: highest set bit in the last byte
